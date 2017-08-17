@@ -84,6 +84,7 @@ CFeeRate minRelayTxFee = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
 CAmount maxTxFee = DEFAULT_TRANSACTION_MAXFEE;
 
 CTxMemPool mempool(::minRelayTxFee);
+CustomLog customLog;
 
 static void CheckBlockIndex(const Consensus::Params &consensusParams);
 
@@ -2342,6 +2343,21 @@ static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
         LogPrintf(" warning='%s'",
                   boost::algorithm::join(warningMessages, ", "));
     LogPrintf("\n");
+    
+    // write custom log
+    if (customLog.IsInitialized()) {
+        CBlock block;
+        ReadBlockFromDisk(block, chainActive.Tip(), Params().GetConsensus());
+
+        CDataStream ssBlock(SER_NETWORK, PROTOCOL_VERSION);
+        ssBlock << block;
+        std::string blkHex = HexStr(ssBlock.begin(), ssBlock.end());
+
+        customLog.appendf(1/*block*/, "%d|%s|%s",
+                          chainActive.Height(),
+                          chainActive.Tip()->GetBlockHash().ToString().c_str(),
+                          blkHex.c_str());
+    }
 }
 
 /**
@@ -2398,6 +2414,12 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
             const CTransaction &tx = *it;
             // ignore validation errors in resurrected transactions
             CValidationState stateDummy;
+            
+            // 1. when reject blocks(reorg), "log2producer" will put txs into it's mempool, so don't need to output tx logs here
+            // 2. bitcoind will output tx logs before update block, will cause "log2producer" error, it need to see the block reject log first
+            // Don't output tx logs when put them into mempool aagin, function DisconnectTip() has lock inside, it's safe to change the flag to 'false'
+            mempool.isOutputAddCustomLog = false;
+            
             if (tx.IsCoinBase() ||
                 !AcceptToMemoryPool(config, mempool, stateDummy, it, false,
                                     nullptr, nullptr, true)) {
@@ -2405,6 +2427,8 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
             } else if (mempool.exists(tx.GetId())) {
                 vHashUpdate.push_back(tx.GetId());
             }
+            
+            mempool.isOutputAddCustomLog = true;  // reset to 'true'
         }
         // AcceptToMemoryPool/addUnchecked all assume that new mempool entries
         // have no in-mempool children, which is generally not true when adding

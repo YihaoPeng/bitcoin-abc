@@ -861,6 +861,8 @@ std::string HelpMessage(HelpMessageMode mode) {
                                    "time, seconds since epoch (default: %u)"),
                                  DEFAULT_UAHF_START_TIME));
 
+    strUsage += HelpMessageOpt("-customlogdir=<dir>", _("custom log dir"));
+
     return strUsage;
 }
 
@@ -2182,6 +2184,23 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
 #ifdef ENABLE_WALLET
     if (pwalletMain) pwalletMain->postInitProcess(threadGroup);
 #endif
+
+    // ********************************************************* Step: init custom log
+    std::string customLogDir = GetArg("-customlogdir", "");
+    if (customLogDir.length()) {
+        CBlock block;
+        ReadBlockFromDisk(block, chainActive.Tip(), Params().GetConsensus());
+        CDataStream ssBlock(SER_NETWORK, PROTOCOL_VERSION);
+        ssBlock << block;
+        std::string blkHex = HexStr(ssBlock.begin(), ssBlock.end());
+        bool res = customLog.init(customLogDir,
+                                  chainActive.Height(),
+                                  chainActive.Tip()->GetBlockHash().ToString(),
+                                  blkHex);
+        if (!res) {
+            // TODO: throw exception
+        }
+    }
 
     return !fRequestShutdown;
 }

@@ -20,6 +20,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <cstdio>
 #include <exception>
 #include <map>
 #include <string>
@@ -28,6 +29,7 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/signals2/signal.hpp>
 #include <boost/thread/exceptions.hpp>
+#include <boost/thread.hpp>  // boost::mutex
 
 static const bool DEFAULT_LOGTIMEMICROS = false;
 static const bool DEFAULT_LOGIPS = false;
@@ -233,5 +235,28 @@ template <typename Callable> void TraceThread(const char *name, Callable func) {
 }
 
 std::string CopyrightHolders(const std::string &strPrefix);
+
+class CustomLog {
+    bool isInitialized_;
+    boost::mutex lock_;
+    std::string dir_;
+    std::string notifyFile_;
+
+    int fd_;   // LOCK file
+    FILE *f_;  // log file handler
+    int fileIndex_;
+
+    void trySwitchFile();
+    void append(const int logType, const char *str);
+
+public:
+    CustomLog();
+    ~CustomLog();
+
+    bool init(const std::string dir, const int blockHeight,
+              const std::string &blockHash, const std::string &blockHex);
+    bool IsInitialized();
+    void appendf(const int logType, const char *fmt, ...);
+};
 
 #endif // BITCOIN_UTIL_H

@@ -452,6 +452,9 @@ enum class MemPoolRemovalReason {
  */
 class CTxMemPool {
 private:
+    // whether to output the custom logs or not when remove txs
+    bool isOutputRemoveCustomLog;
+
     //!< Value n means that n times in 2^32 we check.
     uint32_t nCheckFrequency;
     unsigned int nTransactionsUpdated;
@@ -471,6 +474,9 @@ private:
     void trackPackageRemoved(const CFeeRate &rate);
 
 public:
+    // whether to output the custom logs or not when add txs, main.cpp will use it
+    bool isOutputAddCustomLog;
+
     // public only for testing
     static const int ROLLING_FEE_HALFLIFE = 60 * 60 * 12;
 
